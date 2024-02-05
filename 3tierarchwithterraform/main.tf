@@ -91,3 +91,54 @@ resource "aws_instance" "webserver2" {
     subnet_id = aws_subnet.sub2.id
     user_data = file("userdata1.sh")
 }
+
+resource "aws_lb" "webserver_lb" {
+    name = "webserver-lb"
+    internal = false
+    load_balancer_type = "application"
+    security_groups = [aws_security_group.sg.id]
+    subnets = [aws_subnet.sub1.id,aws_subnet.sub2.id]
+    enable_deletion_protection = true
+
+    tags = {
+        Name = "webserver-loadbalancer"
+    }
+}
+
+resource "aws_lb_target_group" "tg" {
+    name = "aws-lb-tg"
+    port = 80
+    protocol = "HTTP"
+    vpc_id = aws_vpc.vpc.id
+
+    health_check {
+      path = "/"
+    }
+}
+
+resource "aws_lb_target_group_attachment" "tga1" {
+    target_group_arn = aws_lb_target_group.tg.arn
+    target_id = aws_instance.webserver1.id
+    port = 80
+}
+
+resource "aws_lb_target_group_attachment" "tga2" {
+    target_group_arn = aws_lb_target_group.tg.arn
+    target_id = aws_instance.webserver2.id
+    port = 80
+}
+
+resource "aws_lb_listener" "listener" {
+    load_balancer_arn = aws_lb.webserver_lb.arn
+    port = 80
+    protocol = "HTTP"
+
+    default_action {
+        target_group_arn = aws_lb_target_group.tg.arn
+        type = "forward"
+    }   
+}
+
+output "loadbalancerdns" {
+    value = aws_lb.webserver_lb.dns_name
+}
